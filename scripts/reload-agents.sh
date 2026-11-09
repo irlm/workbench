@@ -22,7 +22,9 @@ if ! command -v herdr >/dev/null 2>&1; then
 fi
 listing=$(herdr agent list 2>/dev/null) || { echo 'No Herdr session answered (is one running?).'; exit 0; }
 
-# One line per agent: pane, kind, state; the json is read as bytes (scripts/lib.sh: PYTHONUTF8).
+# One line per agent: pane, kind, state. The json is read and the lines are
+# written as bytes: Windows Python would decode a pane title as cp1252 and
+# end every line with CRLF, and "idle\r" is not idle (seen on 2026-11-09).
 rows=$(printf '%s' "$listing" | python3 -c '
 import json, sys
 try:
@@ -30,10 +32,11 @@ try:
 except Exception:
     sys.exit(0)
 for a in agents:
-    print("\t".join([a.get("pane_id", ""), a.get("agent", ""), a.get("agent_status", "unknown")]))
+    sys.stdout.buffer.write(("\t".join([a.get("pane_id", ""), a.get("agent", ""), a.get("agent_status", "unknown")]) + "\n").encode("utf-8"))
 ')
 sent=0 failed=0 skipped=()
 while IFS=$'\t' read -r pane kind state; do
+    state=${state%$'\r'}
     [ -n "$pane" ] || continue
     [ "$kind" = claude ] || continue
     [ "$pane" != "${HERDR_PANE_ID:-}" ] || continue

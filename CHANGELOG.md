@@ -6,7 +6,7 @@ All notable changes to this tmux configuration will be documented in this file.
 
 ### Agents
 
-- `C-a C-r` sends `/reload-plugins` to every Claude Code session under Herdr that is idle or done (`scripts/reload-agents.sh`), so a plugin updated on this machine loads everywhere without visiting each pane; working and blocked sessions are named instead of interrupted, other agent kinds are left alone. `dotup` runs it after the model-router plugin step reports a new version.
+- `C-a C-r` sends `/reload-plugins` to every Claude Code session under Herdr that is idle or done (`scripts/reload-agents.sh`), so a plugin updated on this machine loads everywhere without visiting each pane; working and blocked sessions are named instead of interrupted, other agent kinds are left alone. `dotup` runs it after the model-router plugin step reports a new version. On Windows the first run reached one idle session of two: Python ended each agent's line with CRLF and `idle\r` read as busy; the lines are written as bytes now, and the Windows CI runs the script through Git Bash against a fake `herdr`.
 
 ### Themes
 

@@ -109,6 +109,9 @@ $gitBash = 'C:\Program Files\Git\bin\bash.exe'
 if (Test-Path $gitBash) {
     & $gitBash (Join-Path $RepoRoot 'tests/windows-python-utf8.sh')
     if ($LASTEXITCODE -ne 0) { throw 'Python under Git Bash does not read or write UTF-8 through a pipe.' }
+    # The reload of every idle Claude Code session: the agent lines Python writes must not end in CRLF.
+    & $gitBash (Join-Path $RepoRoot 'tests/windows-reload-agents.sh')
+    if ($LASTEXITCODE -ne 0) { throw 'reload-agents.sh under Git Bash does not reach every idle session.' }
 } else { Write-Output 'Git Bash not found: Python pipe check skipped' }
 
 # The LLM usage card is drawn with curses, which Windows Python gets from the
