@@ -4,6 +4,10 @@ All notable changes to this tmux configuration will be documented in this file.
 
 ## [Unreleased]
 
+### Agents
+
+- `C-a C-r` sends `/reload-plugins` to every Claude Code session under Herdr that is idle or done (`scripts/reload-agents.sh`), so a plugin updated on this machine loads everywhere without visiting each pane; working and blocked sessions are named instead of interrupted, other agent kinds are left alone. `dotup` runs it after the model-router plugin step reports a new version.
+
 ### Themes
 
 - `C-a C-t` offers Herdr's eight other dark themes beside Nord, Catppuccin and High contrast: Tokyo Night, Dracula, Gruvbox, One Dark, Solarized Dark, Kanagawa, Rose Pine and Vesper, with the colours of Herdr 0.9.5. Under Herdr the pick selects Herdr's theme of that name as it ships; tmux, lazygit, fzf and the prompt get the same colours, the ones under 4.5:1 on a selected row lightened (none in Tokyo Night and Vesper, all in Solarized). Herdr's light themes and `terminal` remain in its own picker.

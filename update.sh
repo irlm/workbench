@@ -182,6 +182,11 @@ fi
 if [ "$MODE" = full ] && command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q 'model-router@'; then
     run_logged model-router-marketplace claude plugin marketplace update model-router
     run_logged model-router-plugin claude plugin update model-router@model-router
+    # A new version reaches every idle Claude Code session under Herdr at once (scripts/reload-agents.sh);
+    # the busy ones are named in the log, to reload by hand.
+    if grep -q 'updated from' "$LOG_DIR/model-router-plugin.log" 2>/dev/null && command -v herdr >/dev/null 2>&1; then
+        run_logged reload-agents bash "$ASSET_DIR/scripts/reload-agents.sh"
+    fi
 fi
 if [ "$MODE" = full ] && command -v brew >/dev/null 2>&1; then
     run_logged brew-update brew update --quiet

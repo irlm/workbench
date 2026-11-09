@@ -797,3 +797,36 @@ esac''')
         result = subprocess.run([BASH, '-c', f'source {REPO}/scripts/install-lib.sh; install_model_router'], env=self.env, capture_output=True, text=True)
         self.assertEqual(log.read_text().splitlines(), ['plugin list'])
         self.assertIn('already installed', result.stdout)
+
+    def test_reload_agents_sends_the_command_to_idle_claude_sessions_only(self):
+        agents = {"result": {"agents": [
+            {"pane_id": "w1:p1", "agent": "claude", "agent_status": "idle"},
+            {"pane_id": "w2:p1", "agent": "claude", "agent_status": "working"},
+            {"pane_id": "w2:p2", "agent": "claude", "agent_status": "blocked"},
+            {"pane_id": "w3:p1", "agent": "codex", "agent_status": "idle"},
+            {"pane_id": "w4:p1", "agent": "claude", "agent_status": "done"},
+            {"pane_id": "w5:p1", "agent": "claude", "agent_status": "idle"}]}}
+        self.fake_herdr('case "$1 $2" in "agent list") echo ' + shlex.quote(json.dumps(agents)) + ' ;; *) echo \'{"result":{}}\' ;; esac')
+        # the pane this runs in is the caller's own session: never sent to itself
+        result = self.run_script('scripts/reload-agents.sh', env=dict(self.env, HERDR_PANE_ID='w5:p1'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        prompts = [call for call in self.calls() if call.startswith('agent prompt ')]
+        self.assertEqual(prompts, ['agent prompt w1:p1 /reload-plugins', 'agent prompt w4:p1 /reload-plugins'])
+        self.assertIn('/reload-plugins sent to 2 idle Claude Code session(s).', result.stdout)
+        self.assertIn('w2:p1 (working)', result.stdout)
+        self.assertIn('w2:p2 (blocked)', result.stdout)
+        self.assertNotIn('w3:p1', result.stdout)
+        # another command, and a send that fails is a failure of the run
+        result = self.run_script('scripts/reload-agents.sh', '/restart')
+        self.assertIn('agent prompt w1:p1 /restart', self.calls())
+        self.fake_herdr('case "$1 $2" in "agent list") echo ' + shlex.quote(json.dumps(agents)) + ' ;; "agent prompt") exit 1 ;; esac')
+        result = self.run_script('scripts/reload-agents.sh')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('FAILED w1:p1', result.stdout)
+        # no Herdr server, or no Claude session: a note, not a failure (dotup runs this)
+        self.fake_herdr('exit 1')
+        result = self.run_script('scripts/reload-agents.sh')
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'No Herdr session answered (is one running?).'))
+        self.fake_herdr('echo \'{"result":{"agents":[{"pane_id":"w3:p1","agent":"codex","agent_status":"idle"}]}}\'')
+        result = self.run_script('scripts/reload-agents.sh')
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, 'No Claude Code session is running under Herdr.'))

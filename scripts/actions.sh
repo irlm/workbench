@@ -56,6 +56,7 @@ run_action() {
         editor-pick) "$SCRIPT_DIR/editor.sh" ;;
         agents) "$SCRIPT_DIR/agents.sh" ;;
         last-agent) "$SCRIPT_DIR/agents.sh" --last ;;
+        reload-agents) "$SCRIPT_DIR/reload-agents.sh"; rc=$?; pause_close; return "$rc" ;;
         review) "$SCRIPT_DIR/review.sh" ;;
         worktree) "$SCRIPT_DIR/worktree.sh" ;;
         llm)
