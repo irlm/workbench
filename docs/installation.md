@@ -184,7 +184,7 @@ Shell integration uses the selected Bash or Zsh shell and preserves personal rc 
 6. in a full run, updates the model-router plugin when it is installed
 7. runs the health check (`dotcheck` on its own) and names anything missing or wrong
 
-It changes nothing in your personal rc files and keeps `~/.config/tmux-user/`. It runs fine from a pane inside Herdr or tmux; only a Herdr binary update needs you to detach (`C-a q`) and start `herdr` again, since a running session keeps the old binary.
+It changes nothing in your personal rc files and keeps `~/.config/tmux-user/`. It runs fine from a pane inside Herdr or tmux. Herdr refuses to update its own binary from inside one of its panes, so a full run from there skips that step with a note; run `herdr update` from a terminal outside Herdr, then start `herdr` again.
 
 For an existing managed installation, use the updater; reinstalling is normally unnecessary:
 
