@@ -132,7 +132,8 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
     $ghDash = gh extension list 2>$null | Select-String "dlvhdr/gh-dash"
     gh auth status 2>&1 | Out-Null
     if ($ghDash) {
-        Write-Host "  gh-dash already installed"
+        Write-Host "  gh-dash installed; upgrading gh extensions..."
+        gh extension upgrade --all *> $null
     } elseif ($LASTEXITCODE -ne 0) {
         Write-Host "  gh-dash skipped: run 'gh auth login', then 'gh extension install dlvhdr/gh-dash'" -ForegroundColor Yellow
     } else {
@@ -460,6 +461,12 @@ if ($profileContent -notmatch 'env:EDITOR') {
     Add-Content $PROFILE "`n# --- editor (Helix; nvim when installed with INSTALL_NVIM=1) ---"
     Add-Content $PROFILE 'if (-not $env:EDITOR) { $env:EDITOR = "hx" }'
 }
+# dotup, as on Unix: rerunning this installer pulls the checkouts, re-renders the Herdr config,
+# updates the model-router plugin and the gh extensions, and reloads the idle Claude Code sessions.
+if ($profileContent -notmatch 'function dotup') {
+    Add-Content $PROFILE "`n# --- dotup: update the workbench (install.ps1 again) ---"
+    Add-Content $PROFILE "function dotup { & `"$tmuxPath\install.ps1`" }"
+}
 
 # --- Herdr -----------------------------------------------
 # Herdr (herdr.dev) is the desktop multiplexer: installed unless INSTALL_HERDR=0,
@@ -513,13 +520,25 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
     Write-Host "Herdr not installed (INSTALL_HERDR=0, or its installer failed). Rerun without it, or see https://herdr.dev"
 }
 
-# --- model-router (opt-in) -------------------------------
-# INSTALL_ROUTER=1: the model-router plugin for Claude Code (github.com/irlm/model-router).
-if ($env:INSTALL_ROUTER -eq "1") {
-    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+# --- model-router -----------------------------------------
+# An installed model-router plugin (github.com/irlm/model-router) is updated on every run, the way
+# update.sh does on Unix, and the idle Claude Code sessions under Herdr reload it; INSTALL_ROUTER=1 installs it.
+$claudeCli = Get-Command claude -ErrorAction SilentlyContinue
+if ($claudeCli -and ((claude plugin list 2>$null) -match 'model-router@')) {
+    Write-Host "Updating the model-router plugin..."
+    $routerBefore = ((claude plugin list 2>$null) -join "`n") -replace '(?s).*model-router@[^\n]*\n\s*Version:\s*([0-9.]+).*', '$1'
+    claude plugin marketplace update model-router *> $null
+    claude plugin update model-router@model-router *> $null
+    $routerAfter = ((claude plugin list 2>$null) -join "`n") -replace '(?s).*model-router@[^\n]*\n\s*Version:\s*([0-9.]+).*', '$1'
+    if ($routerAfter -ne $routerBefore) {
+        Write-Host "  model-router $routerBefore -> $routerAfter"
+        $gitBash = "C:\Program Files\Git\bin\bash.exe"
+        if (Test-Path $gitBash) { & $gitBash "$tmuxPath\scripts\reload-agents.sh" }
+        else { Write-Host "  /reload-plugins in each Claude Code session loads it" }
+    } else { Write-Host "  model-router is current ($routerAfter)" }
+} elseif ($env:INSTALL_ROUTER -eq "1") {
+    if (-not $claudeCli) {
         Write-Host "model-router skipped: the claude CLI is not installed"
-    } elseif ((claude plugin list 2>$null) -match 'model-router@') {
-        Write-Host "model-router already installed (update: claude plugin update model-router@model-router)"
     } else {
         Write-Host "Installing the model-router plugin for Claude Code..."
         claude plugin marketplace add irlm/model-router *> $null

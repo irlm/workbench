@@ -23,8 +23,13 @@ for arg in "$@"; do
 done
 failures=0
 failed() { printf '  FAILED: %s\n' "$*" >&2; failures=$((failures + 1)); }
+# Steps that did not run here, listed again in the summary so a passing run says what it left out.
+skipped=""
+skip() { printf '  SKIP: %s\n' "$*"; skipped="$skipped, ${*%%:*}"; }
+# The installed model-router widget's version, from the plugin list ("" when not installed).
+router_version() { claude plugin list 2>/dev/null | sed -n '/model-router@/,/Version/s/.*Version: *//p' | head -1; }
 update_repo() {
-    local name=$1 dir=$2 remote head changes managed alias deleted
+    local name=$1 dir=$2 remote head changes managed alias deleted_files _f _old
     printf '\n── %s ──\n' "$name"
     if [ ! -d "$dir/.git" ] && [ ! -f "$dir/.git" ]; then failed "$name repo missing — run install.sh"; return; fi
     remote=$(git -C "$dir" remote get-url origin 2>/dev/null) || { failed "$name has no origin remote"; return; }
@@ -54,6 +59,10 @@ update_repo() {
                 ' M lazy-lock.json'|'M  lazy-lock.json'|'MM lazy-lock.json')
                     # Lazy sync rewrites this generated file. Keep both its index
                     # and working versions in Git before taking upstream's lock.
+                    # One backup is kept: the earlier dotup stashes go first (22 had piled up by 2026-11-09).
+                    while _old=$(git -C "$dir" stash list --format='%gd %gs' 2>/dev/null | awk '/dotup: generated Neovim lock/ {print $1; exit}') && [ -n "$_old" ]; do
+                        git -C "$dir" stash drop "$_old" >/dev/null 2>&1 || break
+                    done
                     if ! git -C "$dir" stash push -m "dotup: generated Neovim lock $(date -u +%Y%m%dT%H%M%SZ)" -- lazy-lock.json; then
                         failed "$name lock backup; existing files preserved"; return
                     fi
@@ -65,8 +74,9 @@ update_repo() {
         git -C "$dir" -c http.lowSpeedLimit=100 -c http.lowSpeedTime=15 pull --ff-only origin main || failed "$name pull; resolve local changes in $dir"
         # A tracked file that went missing (a failed rewrite on Windows, a
         # stray delete) breaks every popup; nothing here is edited by hand.
-        deleted=$(git -C "$dir" ls-files --deleted 2>/dev/null | tr '\n' ' ')
-        if [ -n "$deleted" ] && git -C "$dir" checkout -- $deleted; then printf '  Restored missing files: %s\n' "${deleted% }"; fi
+        deleted_files=()
+        while IFS= read -r _f; do [ -n "$_f" ] && deleted_files+=("$_f"); done < <(git -C "$dir" ls-files --deleted 2>/dev/null)
+        if [ "${#deleted_files[@]}" -gt 0 ] && git -C "$dir" checkout -- "${deleted_files[@]}"; then printf '  Restored missing files: %s\n' "${deleted_files[*]}"; fi
     fi
 }
 
@@ -164,13 +174,13 @@ if [ -f "$TMUX_DIR/herdr/config.toml" ] && command -v herdr >/dev/null 2>&1 &&
     # there this is a note, not a failure.
     if [ "$MODE" = full ] || herdr_too_old >/dev/null; then
         if [ "${HERDR_ENV:-}" = 1 ]; then
-            printf '  SKIP: herdr-update (Herdr %s; run `herdr update` from a terminal outside Herdr, a running session keeps its binary)\n' "$(herdr_version)"
+            skip "herdr-update: Herdr $(herdr_version) $(herdr_latest_note); run \`herdr update\` from a terminal outside Herdr, a running session keeps its binary"
         else
             run_logged herdr-update herdr update
         fi
     fi
     run_logged herdr-config bash "$ASSET_DIR/scripts/herdr-config.sh"
-    install_herdr_skill || true
+    install_herdr_skill || printf '  NOTE: the Herdr skill for Claude Code was not installed (claude not on PATH, or ~/.claude not writable)\n'
 fi
 if [ "$profile" != server ] && command -v gh >/dev/null 2>&1; then
     if gh extension list 2>/dev/null | grep -F 'dlvhdr/gh-dash' >/dev/null; then
@@ -180,11 +190,27 @@ fi
 # An installed model-router plugin follows its marketplace in a full update
 # (install.sh --router put it there); the new version loads when Claude Code restarts.
 if [ "$MODE" = full ] && command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q 'model-router@'; then
+    router_before=$(router_version)
     run_logged model-router-marketplace claude plugin marketplace update model-router
+    # Claude Code has reported "Successfully updated" while keeping a stale clone (2026-11-09): the clone's
+    # commit is checked against GitHub and fast-forwarded when behind, so the plugin update sees the new version.
+    router_clone=$(python3 -c 'import json, os, sys
+try:
+    print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["model-router"]["installLocation"])
+except Exception:
+    pass' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/known_marketplaces.json" 2>/dev/null)
+    if [ -n "$router_clone" ] && [ -d "$router_clone/.git" ]; then
+        upstream=$(git ls-remote https://github.com/irlm/model-router HEAD 2>/dev/null | cut -f1)
+        if [ -n "$upstream" ] && [ "$(git -C "$router_clone" rev-parse HEAD 2>/dev/null)" != "$upstream" ]; then
+            printf '  model-router marketplace clone is behind GitHub: pulling\n'
+            run_logged model-router-clone-pull git -C "$router_clone" pull --ff-only
+        fi
+    fi
     run_logged model-router-plugin claude plugin update model-router@model-router
     # A new version reaches every idle Claude Code session under Herdr at once (scripts/reload-agents.sh);
     # the busy ones are named in the log, to reload by hand.
-    if grep -q 'updated from' "$LOG_DIR/model-router-plugin.log" 2>/dev/null && command -v herdr >/dev/null 2>&1; then
+    if [ "$(router_version)" != "$router_before" ] && command -v herdr >/dev/null 2>&1; then
+        printf '  model-router %s -> %s\n' "${router_before:-none}" "$(router_version)"
         run_logged reload-agents bash "$ASSET_DIR/scripts/reload-agents.sh"
     fi
 fi
@@ -218,4 +244,8 @@ if [ "$failures" -gt 0 ]; then
     printf '\nUpdate incomplete: %s component(s) failed. Logs: %s\n' "$failures" "$LOG_DIR"
     exit 1
 fi
-printf '\nAll requested updates and required health checks passed. Logs: %s\n' "$LOG_DIR"
+if [ -n "$skipped" ]; then
+    printf '\nAll requested updates and required health checks passed; skipped here:%s. Logs: %s\n' "${skipped#,}" "$LOG_DIR"
+else
+    printf '\nAll requested updates and required health checks passed. Logs: %s\n' "$LOG_DIR"
+fi

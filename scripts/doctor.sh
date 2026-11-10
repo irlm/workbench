@@ -15,6 +15,7 @@ _deleted=$(git -C "$TMUX_CONFIG_DIR" ls-files --deleted 2>/dev/null | tr '\n' ' 
 [ -z "$_deleted" ] || fail "Files missing from the checkout: ${_deleted% } — run: git -C $TMUX_CONFIG_DIR checkout -- ."
 unset _deleted
 while IFS= read -r tool; do
+    case "$tool:$(uname -s)" in tmux:MINGW*|tmux:MSYS*|tmux:CYGWIN*) continue ;; esac   # Herdr is the multiplexer on Windows; tmux has no build there
     command -v "$tool" >/dev/null 2>&1 || fail "$tool missing — run $TMUX_CONFIG_DIR/update.sh --fix"
 done < <(managed_tools "$profile")
 if command -v tmux >/dev/null 2>&1; then
@@ -112,6 +113,25 @@ if command -v herdr >/dev/null 2>&1; then
     else
         echo '  Herdr: installed but not configured from this repo (run scripts/herdr-config.sh).'
     fi
+fi
+# The popups' Python: UTF-8 through a pipe (scripts/lib.sh sets PYTHONUTF8; without it the agents picker and the
+# sidebar break on a pane title), curses for the usage card, quota-axi for its live limits.
+if python3 -c 'pass' >/dev/null 2>&1; then
+    _spin=$'\xe2\x97\x90'
+    _enc=$(printf '{"t":"%s"}' "$_spin" | python3 -c 'import json, sys; print(json.load(sys.stdin)["t"] == "◐")' 2>/dev/null)
+    [ "$_enc" = True ] || fail 'Python does not read UTF-8 from a pipe (PYTHONUTF8 not in effect): open a new terminal, or check scripts/lib.sh is sourced.'
+    python3 -c 'import curses' >/dev/null 2>&1 || warn 'Python has no curses: C-a $ shows the plain usage report (Windows: python -m pip install windows-curses).'
+    command -v quota-axi >/dev/null 2>&1 || warn 'quota-axi missing: C-a $ has no live window data (npm install -g quota-axi).'
+    unset _spin _enc
+else
+    fail 'Python 3 missing (python3, or python on Windows): every picker needs it.'
+fi
+if command -v claude >/dev/null 2>&1; then
+    if command -v herdr >/dev/null 2>&1 && [ ! -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/herdr/SKILL.md" ]; then
+        warn 'Herdr skill for Claude Code not installed — run update.sh (install_herdr_skill).'
+    fi
+    # plain grep, not -q: under pipefail an early exit would look like no match
+    if claude plugin list 2>/dev/null | grep 'model-router@' >/dev/null; then echo '  model-router: installed; dotup updates it and reloads the idle sessions.'; fi
 fi
 if [ "$failures" -gt 0 ]; then printf 'Health check: %s failure(s).\n' "$failures"; exit 1; fi
 printf 'Health check: required tools and configuration passed.\n'

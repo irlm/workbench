@@ -17,3 +17,9 @@ if [ "$got" != "$spinner" ]; then
     exit 1
 fi
 echo 'Python pipes are UTF-8: passed'
+# Windows Python ends every line with CRLF; through scripts/lib.sh's wrapper a pipe gets LF only, so a bash
+# `read` never keeps a CR in its last field ("idle\r", a path) — seen in C-a C-r's first run, 2026-11-09.
+case "$(python3 -c 'print("idle")' | od -An -c | tr -d ' \n')" in
+    *'\r'*) echo 'Python wrote CRLF into a pipe (scripts/lib.sh did not strip it)' >&2; exit 1 ;;
+esac
+echo 'Python pipes end lines with LF: passed'

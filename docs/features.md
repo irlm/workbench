@@ -119,6 +119,7 @@ and the theme from `scripts/appearance.py`. Nothing needs compiling.
 | `scripts/pick.sh` | pick text to copy or a URL to open from the pane behind the popup |
 | `scripts/editor.sh` | `C-a C-v`: choose Helix, Neovim or Vim, once or as the machine's default editor |
 | `scripts/agents.sh` | Herdr's `C-a w`: every agent with state, task, context trend and time in state; jump, read, prompt. `C-a C-b`: back to the last one prompted |
+| `scripts/reload-agents.sh` | `C-a C-r`: `/reload-plugins` in every idle Claude Code session under Herdr; `dotup` runs it after a model-router update |
 | `scripts/review.sh` | `C-a C-d`: changed files with the diff beside; open at the change, send to the agent |
 | `scripts/worktree.sh` | `C-a C-g`: open or create a worktree per task, as a session (tmux) or grouped workspace (Herdr) |
 | `scripts/agent-events.sh` | Herdr plugin hook on every agent state change: journal plus the `$changes` workspace token |

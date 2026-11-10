@@ -193,11 +193,13 @@ way. Neovim is the optional second editor (`install.sh --nvim`).
 |-----|--------|
 | `w` | Herdr: every coding agent in the sidebar's order (under its workspace, or by urgency with `herdr_agent_sort=priority`) with state, task, context size, time in that state; the preview opens with how that context grew. Enter jumps to it, `C-r` reads its last 400 lines, `C-s` sends it a prompt, `C-d` reviews its changes |
 | `C-b` | back to the agent you last prompted or jumped to, from `C-a w`, Helix `- a` or the review, on either host. It says so when that agent is gone |
+| `C-r` | Herdr: `/reload-plugins` in every Claude Code session that is idle or done, so a plugin updated on this machine loads everywhere at once; the working and blocked ones are named, to reload when free (`dotup` does the same after it updates the model-router plugin) |
 | `C-d` | review the changes in the repository behind the pane: one row per changed file, the diff beside it (`delta`; `C-d` switches to `difftastic`). Enter opens the file in `$EDITOR` at its first changed line, `C-a` sends that diff to the agent, `C-w` shows the whole diff, `C-y` copies the path, `C-g` lazygit |
 | `C-g` | a worktree per task: pick an existing worktree or type a branch name. tmux opens it as a session, Herdr as a grouped workspace; both use `~/.herdr/worktrees/<repo>/<branch>` (`@worktree_dir`). `C-a` in the picker also starts a fresh agent there (`@worktree_agent`, default `claude`): one session per task keeps each one small |
 
-Under Herdr the sidebar adds the live part: agents queued by urgency, the
-task under each Claude Code or Codex row, and `3 files +40 -12` under each
+Under Herdr the sidebar adds the live part: agents under their workspace (or
+queued by urgency with `herdr_agent_sort=priority`), the task and context size
+under each Claude Code or Codex row, and `3 files +40 -12` under each
 workspace; see the [Herdr guide](herdr.md#working-with-agents).
 
 ## Utilities

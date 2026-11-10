@@ -7,6 +7,15 @@ All notable changes to this tmux configuration will be documented in this file.
 ### Agents
 
 - `C-a C-r` sends `/reload-plugins` to every Claude Code session under Herdr that is idle or done (`scripts/reload-agents.sh`), so a plugin updated on this machine loads everywhere without visiting each pane; working and blocked sessions are named instead of interrupted, other agent kinds are left alone. `dotup` runs it after the model-router plugin step reports a new version. On Windows the first run reached one idle session of two: Python ended each agent's line with CRLF and `idle\r` read as busy; the lines are written as bytes now, and the Windows CI runs the script through Git Bash against a fake `herdr`.
+- Fixed: the same CRLF reached five more scripts on Windows (the agents picker's directory column, the sessionizer's workspace match, the worktree picker's workspace id, the cheat.sh query, the review's path). `scripts/lib.sh` now wraps Python on Windows so that what it writes into a pipe ends in LF; a terminal (the usage card) is untouched. The Windows CI checks it.
+- Fixed: `ctrl+h/j/k/l` moved Herdr's focus instead of Neovim's window on Windows, where the process is `nvim.exe`.
+- The agents picker survives an agent record without a pane id instead of showing nothing.
+
+### Update
+
+- `dotup` checks the model-router marketplace clone against GitHub after Claude Code's own update, which has reported success while keeping a stale clone, and fast-forwards it when behind; the reload of the idle sessions is gated on the installed version changing. The Neovim lockfile backup keeps one stash instead of one per run (22 had accumulated). Skipped steps are listed in the final line; the Herdr step says whether the installed binary is current (herdr.dev's release manifest). A tracked file restored after a stray delete is quoted (paths with spaces).
+- Windows: rerunning `install.ps1` (`C-a C-u`) now updates an installed model-router plugin and reloads the idle Claude Code sessions, upgrades the gh extensions, and writes a `dotup` function into the PowerShell profile. The Herdr config rendered on Windows keeps agents under their workspace by default, as on Unix, and its plugin carries the menu entries (palette, projects, notes, help).
+- `doctor` checks Python reads UTF-8 from a pipe, says when curses (the usage card) or quota-axi (its live limits) is missing, notes the Herdr skill for Claude Code, and does not require tmux on Windows.
 
 ### Themes
 

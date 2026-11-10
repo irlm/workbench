@@ -172,8 +172,9 @@ function Render-Config {
     } else {
         $status = "  { type = `"command`", command = $(TomlString $statusCommand), interval_seconds = 15, timeout_seconds = 20 },"
     }
-    $sort = Get-Option 'herdr_agent_sort' 'priority'
-    if ($sort -notin @('spaces', 'priority')) { $sort = 'priority' }
+    # The same default as herdr-config.sh and the docs: agents under their workspace; `priority` queues them by urgency.
+    $sort = Get-Option 'herdr_agent_sort' 'spaces'
+    if ($sort -notin @('spaces', 'priority')) { $sort = 'spaces' }
     $worktrees = Get-Option 'worktree_dir' '~/.herdr/worktrees'
     foreach ($line in Get-Content $Template) {
         if ($line -match '@@THEME@@') { [void]$out.AppendLine($theme); continue }
@@ -224,7 +225,16 @@ function Render-Plugin {
     $events = (Join-Path $Root 'scripts\agent-events.sh')
     $lines += ''; $lines += '[[events]]'; $lines += 'on = "pane.agent_status_changed"'
     $lines += "command = [$(TomlString $bash.path), $(TomlString $events)]"
-    foreach ($row in Import-Csv $Registry -Delimiter "`t") {
+    # The plugin menu entries, as herdr-config.sh renders them: the palette, projects, notes and help.
+    $rows = @(Import-Csv $Registry -Delimiter "`t")
+    $herdrCmd = if ($env:HERDR_BIN_PATH) { $env:HERDR_BIN_PATH } else { 'herdr' }
+    foreach ($id in @('palette', 'projects', 'notes', 'help')) {
+        $row = $rows | Where-Object { $_.id -eq $id } | Select-Object -First 1
+        if (-not $row) { continue }
+        $lines += ''; $lines += '[[actions]]'; $lines += "id = `"$id`""; $lines += "title = $(TomlString $row.label)"; $lines += 'contexts = ["workspace"]'
+        $lines += "command = [$(TomlString $herdrCmd), `"plugin`", `"pane`", `"open`", `"--plugin`", `"$PluginId`", `"--entrypoint`", `"$id`", `"--placement`", `"popup`", `"--width`", `"$size`", `"--height`", `"$size`"]"
+    }
+    foreach ($row in $rows) {
         if (-not $row.id -or $row.hosts -eq 'tmux' -or $row.id -in @('new-session', 'rename-session', 'rename-window')) { continue }
         $script = (Join-Path $Root 'scripts\actions.sh')
         $lines += ''; $lines += '[[panes]]'; $lines += "id = `"$($row.id)`""; $lines += "title = $(TomlString $row.label)"

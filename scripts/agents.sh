@@ -70,7 +70,10 @@ for a in agents:
     title = a.get("terminal_title_stripped") or a.get("terminal_title") or ""
     icon = ICON.get(state, "?")
     ctx = (a.get("tokens") or {}).get("ctx_big") or (a.get("tokens") or {}).get("ctx") or ""
-    print("\t".join(["herdr", a["pane_id"], f"{icon} {state:<8}", where, a.get("agent", ""), age(a["pane_id"], state), (title + "  " + ctx).strip(), cwd]))
+    pane = a.get("pane_id") or ""
+    if not pane:   # a record without a pane cannot be jumped to, and must not take the whole list down
+        continue
+    print("\t".join(["herdr", pane, f"{icon} {state:<8}", where, a.get("agent", ""), age(pane, state), (title + "  " + ctx).strip(), cwd]))
 '
 }
 

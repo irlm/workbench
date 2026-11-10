@@ -23,7 +23,8 @@ try:
 except Exception:
     sys.exit(0)
 print(procs[-1].get("name", "") if procs else "", end="")')
-case "$front" in
+# Windows names the process nvim.exe: the suffix goes before the match.
+case "${front%.exe}" in
     vim|nvim|vi|view|nvim-*|*vim) action="send ctrl+$key to $front"; result=$(herdr pane send-keys "$pane" "ctrl+$key" 2>&1) ;;
     *) action="focus $direction"; result=$(herdr pane focus --direction "$direction" --pane "$pane" 2>&1) ;;
 esac

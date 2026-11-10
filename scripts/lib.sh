@@ -11,6 +11,19 @@ TMUX_USER_DIR="${TMUX_THEME_DIR:-$HOME/.config/tmux-user}"
 if ! command -v python3 >/dev/null 2>&1 && command -v python >/dev/null 2>&1; then
     python3() { python "$@"; }
 fi
+# Windows Python ends every line it prints with CRLF, and a bash `read` keeps
+# the CR in the last field ("idle\r" is not idle; a path ends in \r). Into a
+# pipe or a capture the CRs are dropped here; on a terminal (the usage card,
+# curses) Python writes directly.
+case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+        if command -v python3 >/dev/null 2>&1; then _wb_python=python3; else _wb_python=python; fi
+        python3() {
+            if [ -t 1 ]; then command "$_wb_python" "$@"
+            else ( set -o pipefail; command "$_wb_python" "$@" | tr -d '\r' ); fi
+        }
+        ;;
+esac
 # Python reads and writes UTF-8 in every script. On Windows a pipe or a file
 # is cp1252 by default: Herdr's JSON (UTF-8, with pane titles in it) does not
 # always decode, and a state icon cannot be written to a picker at all.
@@ -158,6 +171,14 @@ print(next((p["pane_id"] for p in panes if p.get("focused")), ""), end="")'
 # Herdr on its default ctrl+b prefix.
 WB_HERDR_MIN_VERSION=0.9.5
 herdr_version() { command "${HERDR_BIN_PATH:-herdr}" --version 2>/dev/null | sed -n 's/^herdr \([0-9][0-9.]*\).*/\1/p' | head -1; }
+# "(current)" or "(0.9.6 available)" against herdr.dev's release manifest, the one its installer reads; nothing offline.
+herdr_latest_note() {
+    local latest have
+    latest=$(curl -fsSL --max-time 4 https://herdr.dev/latest.json 2>/dev/null | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' | head -1)
+    have=$(herdr_version)
+    [ -n "$latest" ] && [ -n "$have" ] || return 0
+    if version_at_least "$latest" "$have"; then printf '(current)'; else printf '(%s available)' "$latest"; fi
+}
 # version_at_least 0.9.5 0.9.10 -> true when the second is not older.
 version_at_least() {
     local want=$1 have=$2 a b

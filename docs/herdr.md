@@ -243,10 +243,12 @@ popups being Bash scripts:
   popup shows the plain report instead: any key closes it when it fits the
   popup, and it opens in `less` (`q` closes) when it does not.
 
-Rerunning `install.ps1` updates the checkout and re-renders the Herdr config,
-the way `dotup` does on Unix; `C-a C-u` runs it from Herdr. The installer
-wants an Administrator PowerShell (fonts, winget), so from a Herdr started
-without one, update from any PowerShell window instead; Herdr can stay open:
+Rerunning `install.ps1` updates the checkouts, re-renders the Herdr config,
+updates the model-router plugin and the gh extensions and reloads the idle
+Claude Code sessions, the way `dotup` does on Unix; `C-a C-u` runs it from
+Herdr, and the installer writes a `dotup` function into the PowerShell profile
+that does the same from any window. Administrator rights are optional (winget
+and the font install may ask); Herdr can stay open:
 
 ```powershell
 git -C "$HOME\.config\tmux" pull --ff-only

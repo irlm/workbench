@@ -618,6 +618,12 @@ else exec ''' + shlex_quote(real_git) + ''' "$@"; fi''')
         self.assertEqual(git(nvim, 'show', 'stash@{0}:lazy-lock.json'), generated)
         self.assertEqual(git(nvim, 'status', '--porcelain'), '')
         self.assertTrue((self.root / 'nvim-called').exists())
+        # the next run keeps one backup, the newest, instead of one more per run
+        (nvim / 'lazy-lock.json').write_text('{"plugin": "generated again"}\n')
+        result = self.run_script('update.sh', '--quick')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(git(nvim, 'stash', 'list').count('dotup: generated Neovim lock'), 1)
+        self.assertEqual(git(nvim, 'show', 'stash@{0}:lazy-lock.json'), '{"plugin": "generated again"}\n')
 
     def test_updater_preserves_staged_and_working_nvim_lock_versions(self):
         nvim, git = self.updater_git_fixture()
